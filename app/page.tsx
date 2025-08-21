@@ -286,7 +286,13 @@ Example:
                                     textParts.push(
                                       <span 
                                         key={`highlight-${index}`}
-                                        className={`cursor-pointer px-0.5 rounded ${item.type === 'warning' ? 'bg-yellow-200' : 'bg-blue-200'}`}
+                                        className={`cursor-pointer px-0.5 rounded transition-colors duration-150 ${item.type === 'warning' 
+                                          ? hoverHighlight?.item === item 
+                                            ? 'bg-red-300' 
+                                            : 'bg-red-200 hover:bg-red-300' 
+                                          : hoverHighlight?.item === item 
+                                            ? 'bg-blue-300' 
+                                            : 'bg-blue-200 hover:bg-blue-300'}`}
                                         onMouseEnter={(e) => {
                                           setHoverHighlight({
                                             item,
