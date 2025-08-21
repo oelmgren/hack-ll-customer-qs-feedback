@@ -6,6 +6,7 @@ import { Button } from './components/ui/button';
 import { Textarea } from './components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Badge } from './components/ui/badge';
+import { Logo } from './components/ui/logo';
 import { MessageSquare, Users, Target, CheckCircle, ArrowRight, Lightbulb } from 'lucide-react';
 
 interface FeedbackItem {
@@ -137,12 +138,9 @@ export default function HomePage() {
       <header className="border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-semibold">Listen Labs</span>
-            </div>
+            <a href="https://listenlabs.ai" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
+              <Logo size="md" />
+            </a>
           </div>
         </div>
       </header>
@@ -377,19 +375,10 @@ Example:
       {/* Footer */}
       <footer className="py-8 border-t">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
-                <MessageSquare className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <span>Listen Labs</span>
-            </div>
-            <div className="flex space-x-6 text-sm text-muted-foreground">
-              <a href="#" className="hover:text-foreground">About</a>
-              <a href="#" className="hover:text-foreground">Privacy</a>
-              <a href="#" className="hover:text-foreground">Terms</a>
-              <a href="#" className="hover:text-foreground">Contact</a>
-            </div>
+          <div className="flex justify-center">
+            <a href="https://listenlabs.ai" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
+              <Logo size="sm" />
+            </a>
           </div>
         </div>
       </footer>
