@@ -1,26 +1,59 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from './components/ui/button';
 import { Textarea } from './components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Badge } from './components/ui/badge';
 import { MessageSquare, Users, Target, CheckCircle, ArrowRight, Lightbulb } from 'lucide-react';
 
+interface FeedbackItem {
+  start_index: number;
+  end_index: number;
+  type: 'recommendation' | 'warning';
+  note: string;
+  confidence_level: number;
+}
+
+interface AnalysisResponse {
+  feedback: FeedbackItem[];
+  summary: string;
+}
+
 export default function HomePage() {
   const [discussionGuide, setDiscussionGuide] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGetFeedback = async () => {
     if (!discussionGuide.trim()) return;
     
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsLoading(false);
+    setError(null);
+    setAnalysis(null);
     
-    // For now, just show an alert - this would connect to backend
-    alert('Feedback analysis complete! In a real implementation, this would show detailed insights about your discussion guide.');
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ discussionGuide }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze discussion guide');
+      }
+
+      const data: AnalysisResponse = await response.json();
+      setAnalysis(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const features = [
@@ -140,6 +173,71 @@ Example:
           </Card>
         </div>
       </section>
+
+      {/* Analysis Results */}
+      {error && (
+        <section className="py-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Card className="border-destructive">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 text-destructive mb-2">
+                  <div className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
+                  <span className="font-medium">Error</span>
+                </div>
+                <p className="text-sm">{error}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
+
+      {analysis && (
+        <section className="py-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  Analysis Complete
+                </CardTitle>
+                <CardDescription>
+                  {analysis.summary}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {analysis.feedback.map((item, index) => (
+                    <div
+                      key={index}
+                      className={`p-4 rounded-lg border ${
+                        item.type === 'warning' 
+                          ? 'border-yellow-200 bg-yellow-50' 
+                          : 'border-blue-200 bg-blue-50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <Badge 
+                          variant={item.type === 'warning' ? 'destructive' : 'secondary'}
+                          className="mb-2"
+                        >
+                          {item.type === 'warning' ? 'Warning' : 'Recommendation'}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          Confidence: {Math.round(item.confidence_level * 100)}%
+                        </span>
+                      </div>
+                      <p className="text-sm mb-2">
+                        <strong>Text:</strong> "{discussionGuide.slice(item.start_index, item.end_index)}"
+                      </p>
+                      <p className="text-sm">{item.note}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
 
       {/* Sample Questions */}
       <section className="py-12 bg-muted/30">
