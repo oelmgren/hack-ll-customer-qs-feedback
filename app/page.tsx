@@ -39,61 +39,26 @@ export default function HomePage() {
     setHoverHighlight(null);
     
     try {
-      // Create mock feedback items based on the input text
-      const createMockFeedbackItems = (text: string): FeedbackItem[] => {
-        const items: FeedbackItem[] = [];
-        
-        // Find question patterns (numbered questions or questions ending with ?)
-        const questionRegex = /\d+\.\s+([^\n]+\?)|([^\n]+\?)/g;
-        let match;
-        
-        while ((match = questionRegex.exec(text)) !== null) {
-          const questionText = match[1] || match[0];
-          const startIndex = match.index;
-          const endIndex = startIndex + questionText.length;
-          
-          // Randomly decide if it's a recommendation or warning
-          const type = Math.random() > 0.5 ? 'recommendation' : 'warning';
-          
-          items.push({
-            start_index: startIndex,
-            end_index: endIndex,
-            type,
-            note: type === 'recommendation' 
-              ? `This is a well-structured question that encourages detailed responses.` 
-              : `Consider rephrasing this as an open-ended question to get more detailed responses.`,
-            confidence_level: 0.7 + Math.random() * 0.3 // Random between 0.7 and 1.0
-          });
-        }
-        
-        // If no questions found, create a generic feedback item
-        if (items.length === 0 && text.length > 10) {
-          const randomStart = Math.floor(Math.random() * (text.length / 2));
-          const randomLength = Math.min(30, Math.floor(Math.random() * 50));
-          const randomEnd = Math.min(text.length, randomStart + randomLength);
-          
-          items.push({
-            start_index: randomStart,
-            end_index: randomEnd,
-            type: 'recommendation',
-            note: 'Consider adding more specific questions to get better insights.',
-            confidence_level: 0.85
-          });
-        }
-        
-        return items;
-      };
+      // Call the API route to analyze the discussion guide
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ discussionGuide }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze discussion guide');
+      }
+
+      const data: AnalysisResponse = await response.json();
+
+      console.log("API Output", data);
+
+      setAnalysis(data);
       
-      // Create mock analysis with feedback items
-      const mockAnalysis: AnalysisResponse = {
-        feedback: createMockFeedbackItems(discussionGuide),
-        summary: 'Analysis of your discussion guide'
-      };
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setAnalysis(mockAnalysis);
       setInputFolded(true); // Fold the input after getting feedback
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -249,12 +214,65 @@ Example:
                                   let lastIndex = 0;
                                   const textParts = [];
                                   
+                                  // TODO: Implement a more sophisticated algorithm for handling complex overlapping spans
+                                  // Current implementation handles basic overlaps and duplicates but may need improvement
+                                  // for complex nested overlaps or partial overlaps
+                                  
+                                  // First, deduplicate feedback items with identical spans (keep highest confidence)
+                                  const deduplicatedFeedback: FeedbackItem[] = [];
+                                  const spanMap = new Map<string, FeedbackItem>(); // Map to track spans by "start_index-end_index" key
+                                  
+                                  analysis.feedback.forEach(item => {
+                                    const spanKey = `${item.start_index}-${item.end_index}`;
+                                    
+                                    if (!spanMap.has(spanKey) || (spanMap.get(spanKey)?.confidence_level ?? 0) < item.confidence_level) {
+                                      spanMap.set(spanKey, item);
+                                    }
+                                  });
+                                  
+                                  // Convert map values back to array
+                                  spanMap.forEach(item => deduplicatedFeedback.push(item));
+                                  
                                   // Sort feedback items by start_index
-                                  const sortedFeedback = [...analysis.feedback].sort(
+                                  const sortedFeedback = [...deduplicatedFeedback].sort(
                                     (a, b) => a.start_index - b.start_index
                                   );
                                   
-                                  sortedFeedback.forEach((item, index) => {
+                                  // Handle overlapping spans by merging or prioritizing
+                                  const processedFeedback: FeedbackItem[] = [];
+                                  let lastProcessedItem: FeedbackItem | null = null;
+                                  
+                                  for (const item of sortedFeedback) {
+                                    if (!lastProcessedItem) {
+                                      processedFeedback.push(item);
+                                      lastProcessedItem = item;
+                                      continue;
+                                    }
+                                    
+                                    // Check for overlap
+                                    if (item.start_index < lastProcessedItem.end_index) {
+                                      // If current item has higher confidence, replace the last item
+                                      if (item.confidence_level > lastProcessedItem.confidence_level) {
+                                        processedFeedback.pop();
+                                        processedFeedback.push(item);
+                                        lastProcessedItem = item;
+                                      }
+                                      // Otherwise keep the existing item (do nothing)
+                                    } else {
+                                      // No overlap, add the item
+                                      processedFeedback.push(item);
+                                      lastProcessedItem = item;
+                                    }
+                                  }
+                                  
+                                  // Use the processed feedback items for rendering
+                                  const finalFeedback = processedFeedback.sort(
+                                    (a, b) => a.start_index - b.start_index
+                                  );
+                                  
+                                  // Use the final processed feedback
+                                  
+                                  finalFeedback.forEach((item, index) => {
                                     // Add text before the highlight
                                     if (item.start_index > lastIndex) {
                                       textParts.push(
