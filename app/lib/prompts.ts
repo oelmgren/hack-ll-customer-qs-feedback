@@ -36,4 +36,11 @@ Focus on:
 
 5. Areas for improvement
    - Provide actionable recommendations for each flagged issue
-   - Suggest ways to improve clarity, reliability, and respondent experience`
+   - Suggest ways to improve clarity, reliability, and respondent experience
+   
+RULES: 
+- Return your analysis as JSON.
+- Do not include any other text or comments in your response
+- Make sure the indices are correct and the indices are inclusive of the entire word or phrase that is being flagged.
+- Minimize the number of words selected and try to keep the feedback concise and only include the most important feedback.
+`;
