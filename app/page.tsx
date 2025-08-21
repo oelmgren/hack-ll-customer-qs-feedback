@@ -143,7 +143,6 @@ export default function HomePage() {
               </div>
               <span className="text-xl font-semibold">Listen Labs</span>
             </div>
-            <Badge variant="secondary">Beta</Badge>
           </div>
         </div>
       </header>
@@ -342,23 +341,6 @@ Example:
         </div>
       </section>
 
-      {/* Sample Questions */}
-      <section className="py-12 bg-muted/30">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl mb-6 text-center">Need inspiration? Try these proven question patterns:</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sampleQuestions.map((question, index) => (
-              <Card key={index} className="cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => setDiscussionGuide(prev => prev + (prev ? '\n' : '') + `${index + 1}. ${question}`)}>
-                <CardContent className="p-4">
-                  <p className="text-sm">{question}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Features */}
       <section className="py-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -389,14 +371,6 @@ Example:
           <p className="text-xl mb-8 opacity-90">
             Join hundreds of product teams using Listen Labs to conduct better customer interviews
           </p>
-          <div className="flex items-center justify-center gap-4">
-            <CheckCircle className="w-5 h-5" />
-            <span>Free to try</span>
-            <CheckCircle className="w-5 h-5" />
-            <span>No credit card required</span>
-            <CheckCircle className="w-5 h-5" />
-            <span>Instant feedback</span>
-          </div>
         </div>
       </section>
 
