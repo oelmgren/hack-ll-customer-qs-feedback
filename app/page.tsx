@@ -14,6 +14,7 @@ interface FeedbackItem {
   end_index: number;
   type: 'recommendation' | 'warning';
   note: string;
+  highlighted_text: string;
   confidence_level: number;
 }
 
@@ -211,111 +212,103 @@ Example:
                               // Render text with highlights
                               <>
                                 {(() => {
-                                  let lastIndex = 0;
-                                  const textParts = [];
+                                  // Group feedback items by highlighted_text to handle multiple feedbacks for the same text
+                                  const feedbackByText = new Map<string, FeedbackItem[]>();
                                   
-                                  // TODO: Implement a more sophisticated algorithm for handling complex overlapping spans
-                                  // Current implementation handles basic overlaps and duplicates but may need improvement
-                                  // for complex nested overlaps or partial overlaps
-                                  
-                                  // First, deduplicate feedback items with identical spans (keep highest confidence)
-                                  const deduplicatedFeedback: FeedbackItem[] = [];
-                                  const spanMap = new Map<string, FeedbackItem>(); // Map to track spans by "start_index-end_index" key
-                                  
+                                  // Group feedback items by their highlighted text
                                   analysis.feedback.forEach(item => {
-                                    const spanKey = `${item.start_index}-${item.end_index}`;
+                                    if (!item.highlighted_text) return;
                                     
-                                    if (!spanMap.has(spanKey) || (spanMap.get(spanKey)?.confidence_level ?? 0) < item.confidence_level) {
-                                      spanMap.set(spanKey, item);
+                                    if (!feedbackByText.has(item.highlighted_text)) {
+                                      feedbackByText.set(item.highlighted_text, []);
                                     }
+                                    
+                                    feedbackByText.get(item.highlighted_text)!.push(item);
                                   });
                                   
-                                  // Convert map values back to array
-                                  spanMap.forEach(item => deduplicatedFeedback.push(item));
-                                  
-                                  // Sort feedback items by start_index
-                                  const sortedFeedback = [...deduplicatedFeedback].sort(
-                                    (a, b) => a.start_index - b.start_index
-                                  );
-                                  
-                                  // Handle overlapping spans by merging or prioritizing
+                                  // For each group, keep only the item with highest confidence
                                   const processedFeedback: FeedbackItem[] = [];
-                                  let lastProcessedItem: FeedbackItem | null = null;
                                   
-                                  for (const item of sortedFeedback) {
-                                    if (!lastProcessedItem) {
-                                      processedFeedback.push(item);
-                                      lastProcessedItem = item;
-                                      continue;
+                                  feedbackByText.forEach((items, text) => {
+                                    // Sort by confidence level (descending)
+                                    const sortedItems = [...items].sort(
+                                      (a, b) => b.confidence_level - a.confidence_level
+                                    );
+                                    
+                                    // Add the highest confidence item
+                                    processedFeedback.push(sortedItems[0]);
+                                  });
+                                  
+                                  // Now we need to find all occurrences of each highlighted_text in the discussion guide
+                                  const textParts: JSX.Element[] = [];
+                                  let remainingText = discussionGuide;
+                                  let currentIndex = 0;
+                                  
+                                  // Process the text sequentially
+                                  while (remainingText.length > 0) {
+                                    // Find the earliest match among all highlighted texts
+                                    let earliestMatch: {
+                                      text: string;
+                                      index: number;
+                                      item: FeedbackItem;
+                                    } | null = null;
+                                    
+                                    for (const item of processedFeedback) {
+                                      const text = item.highlighted_text;
+                                      const index = remainingText.indexOf(text);
+                                      
+                                      if (index !== -1 && (earliestMatch === null || index < earliestMatch.index)) {
+                                        earliestMatch = { text, index, item };
+                                      }
                                     }
                                     
-                                    // Check for overlap
-                                    if (item.start_index <= lastProcessedItem.end_index) {
-                                      // If current item has higher confidence, replace the last item
-                                      if (item.confidence_level > lastProcessedItem.confidence_level) {
-                                        processedFeedback.pop();
-                                        processedFeedback.push(item);
-                                        lastProcessedItem = item;
+                                    if (earliestMatch) {
+                                      // Add text before the match
+                                      if (earliestMatch.index > 0) {
+                                        textParts.push(
+                                          <span key={`text-${currentIndex}`}>
+                                            {remainingText.substring(0, earliestMatch.index)}
+                                          </span>
+                                        );
                                       }
-                                      // Otherwise keep the existing item (do nothing)
-                                    } else {
-                                      // No overlap, add the item
-                                      processedFeedback.push(item);
-                                      lastProcessedItem = item;
-                                    }
-                                  }
-                                  
-                                  // Use the processed feedback items for rendering
-                                  const finalFeedback = processedFeedback.sort(
-                                    (a, b) => a.start_index - b.start_index
-                                  );
-                                  
-                                  // Use the final processed feedback
-                                  
-                                  finalFeedback.forEach((item, index) => {
-                                    // Add text before the highlight
-                                    if (item.start_index > lastIndex) {
+                                      
+                                      // Add the highlighted text
+                                      const item = earliestMatch.item;
                                       textParts.push(
-                                        <span key={`text-${index}`}>
-                                          {discussionGuide.substring(lastIndex, item.start_index)}
+                                        <span 
+                                          key={`highlight-${currentIndex}`}
+                                          className={`cursor-pointer px-0.5 rounded transition-colors duration-150 ${item.type === 'warning' 
+                                            ? hoverHighlight?.item === item 
+                                              ? 'bg-red-300' 
+                                              : 'bg-red-200 hover:bg-red-300' 
+                                            : hoverHighlight?.item === item 
+                                              ? 'bg-blue-300' 
+                                              : 'bg-blue-200 hover:bg-blue-300'}`}
+                                          onMouseEnter={(e) => {
+                                            setHoverHighlight({
+                                              item,
+                                              x: e.clientX,
+                                              y: e.clientY
+                                            });
+                                          }}
+                                          onMouseLeave={() => setHoverHighlight(null)}
+                                        >
+                                          {earliestMatch.text}
                                         </span>
                                       );
+                                      
+                                      // Update remaining text and index
+                                      remainingText = remainingText.substring(earliestMatch.index + earliestMatch.text.length);
+                                      currentIndex++;
+                                    } else {
+                                      // No more matches, add the remaining text
+                                      textParts.push(
+                                        <span key={`text-end-${currentIndex}`}>
+                                          {remainingText}
+                                        </span>
+                                      );
+                                      break;
                                     }
-                                    
-                                    // Add highlighted text
-                                    textParts.push(
-                                      <span 
-                                        key={`highlight-${index}`}
-                                        className={`cursor-pointer px-0.5 rounded transition-colors duration-150 ${item.type === 'warning' 
-                                          ? hoverHighlight?.item === item 
-                                            ? 'bg-red-300' 
-                                            : 'bg-red-200 hover:bg-red-300' 
-                                          : hoverHighlight?.item === item 
-                                            ? 'bg-blue-300' 
-                                            : 'bg-blue-200 hover:bg-blue-300'}`}
-                                        onMouseEnter={(e) => {
-                                          setHoverHighlight({
-                                            item,
-                                            x: e.clientX,
-                                            y: e.clientY
-                                          });
-                                        }}
-                                        onMouseLeave={() => setHoverHighlight(null)}
-                                      >
-                                        {discussionGuide.substring(item.start_index, item.end_index + 1)}
-                                      </span>
-                                    );
-                                    
-                                    lastIndex = item.end_index + 1;
-                                  });
-                                  
-                                  // Add any remaining text after the last highlight
-                                  if (lastIndex < discussionGuide.length) {
-                                    textParts.push(
-                                      <span key="text-end">
-                                        {discussionGuide.substring(lastIndex)}
-                                      </span>
-                                    );
                                   }
                                   
                                   return textParts;
