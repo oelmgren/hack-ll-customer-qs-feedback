@@ -250,7 +250,7 @@ Example:
                                     }
                                     
                                     // Check for overlap
-                                    if (item.start_index < lastProcessedItem.end_index) {
+                                    if (item.start_index <= lastProcessedItem.end_index) {
                                       // If current item has higher confidence, replace the last item
                                       if (item.confidence_level > lastProcessedItem.confidence_level) {
                                         processedFeedback.pop();
@@ -296,11 +296,11 @@ Example:
                                         }}
                                         onMouseLeave={() => setHoverHighlight(null)}
                                       >
-                                        {discussionGuide.substring(item.start_index, item.end_index)}
+                                        {discussionGuide.substring(item.start_index, item.end_index + 1)}
                                       </span>
                                     );
                                     
-                                    lastIndex = item.end_index;
+                                    lastIndex = item.end_index + 1;
                                   });
                                   
                                   // Add any remaining text after the last highlight
