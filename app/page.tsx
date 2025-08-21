@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from './components/ui/button';
 import { Textarea } from './components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
@@ -25,6 +26,8 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [inputFolded, setInputFolded] = useState(false);
+  const [hoverHighlight, setHoverHighlight] = useState<{item: FeedbackItem, x: number, y: number} | null>(null);
 
   const handleGetFeedback = async () => {
     if (!discussionGuide.trim()) return;
@@ -32,23 +35,65 @@ export default function HomePage() {
     setIsLoading(true);
     setError(null);
     setAnalysis(null);
+    setHoverHighlight(null);
     
     try {
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ discussionGuide }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to analyze discussion guide');
-      }
-
-      const data: AnalysisResponse = await response.json();
-      setAnalysis(data);
+      // Create mock feedback items based on the input text
+      const createMockFeedbackItems = (text: string): FeedbackItem[] => {
+        const items: FeedbackItem[] = [];
+        
+        // Find question patterns (numbered questions or questions ending with ?)
+        const questionRegex = /\d+\.\s+([^\n]+\?)|([^\n]+\?)/g;
+        let match;
+        
+        while ((match = questionRegex.exec(text)) !== null) {
+          const questionText = match[1] || match[0];
+          const startIndex = match.index;
+          const endIndex = startIndex + questionText.length;
+          
+          // Randomly decide if it's a recommendation or warning
+          const type = Math.random() > 0.5 ? 'recommendation' : 'warning';
+          
+          items.push({
+            start_index: startIndex,
+            end_index: endIndex,
+            type,
+            note: type === 'recommendation' 
+              ? `This is a well-structured question that encourages detailed responses.` 
+              : `Consider rephrasing this as an open-ended question to get more detailed responses.`,
+            confidence_level: 0.7 + Math.random() * 0.3 // Random between 0.7 and 1.0
+          });
+        }
+        
+        // If no questions found, create a generic feedback item
+        if (items.length === 0 && text.length > 10) {
+          const randomStart = Math.floor(Math.random() * (text.length / 2));
+          const randomLength = Math.min(30, Math.floor(Math.random() * 50));
+          const randomEnd = Math.min(text.length, randomStart + randomLength);
+          
+          items.push({
+            start_index: randomStart,
+            end_index: randomEnd,
+            type: 'recommendation',
+            note: 'Consider adding more specific questions to get better insights.',
+            confidence_level: 0.85
+          });
+        }
+        
+        return items;
+      };
+      
+      // Create mock analysis with feedback items
+      const mockAnalysis: AnalysisResponse = {
+        feedback: createMockFeedbackItems(discussionGuide),
+        summary: 'Analysis of your discussion guide'
+      };
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setAnalysis(mockAnalysis);
+      setInputFolded(true); // Fold the input after getting feedback
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -129,115 +174,173 @@ export default function HomePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <label htmlFor="discussion-guide" className="block mb-2">
-                  Your Discussion Guide
-                </label>
-                <Textarea
-                  id="discussion-guide"
-                  placeholder="Paste your interview questions here... 
+              {!inputFolded ? (
+                // Input mode - show textarea for entering discussion guide
+                <>
+                  <div>
+                    <label htmlFor="discussion-guide" className="block mb-2">
+                      Your Discussion Guide
+                    </label>
+                    <Textarea
+                      id="discussion-guide"
+                      placeholder="Paste your interview questions here... 
 
 Example:
 1. Tell me about the last time you tried to solve [problem]
 2. What's the most frustrating part of your current process?
 3. How do you currently handle [specific situation]?
 4. What would an ideal solution look like to you?"
-                  value={discussionGuide}
-                  onChange={(e) => setDiscussionGuide(e.target.value)}
-                  className="min-h-[200px] resize-none"
-                />
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">
-                  {discussionGuide.length} characters
-                </span>
-                <Button 
-                  onClick={handleGetFeedback}
-                  disabled={!discussionGuide.trim() || isLoading}
-                  className="flex items-center gap-2"
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      Get Feedback
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </Button>
-              </div>
+                      value={discussionGuide}
+                      onChange={(e) => setDiscussionGuide(e.target.value)}
+                      className="min-h-[200px] resize-none"
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">
+                      {discussionGuide.length} characters
+                    </span>
+                    <Button 
+                      onClick={handleGetFeedback}
+                      disabled={!discussionGuide.trim() || isLoading}
+                      className="flex items-center gap-2"
+                    >
+                      {isLoading ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          Get Feedback
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                // Feedback mode - show folded input and feedback
+                <>
+                  <div className="space-y-6">
+                    {/* Folded input section */}
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-medium">Your Discussion Guide</h3>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setInputFolded(false)}
+                        >
+                          Edit Questions
+                        </Button>
+                      </div>
+                      <div className="bg-muted/50 p-4 rounded-md">
+                        <p className="text-sm whitespace-pre-wrap">{discussionGuide}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Feedback section */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-3">Feedback</h3>
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="text-sm whitespace-pre-wrap">
+                            {analysis && analysis.feedback.length > 0 ? (
+                              // Render text with highlights
+                              <>
+                                {(() => {
+                                  let lastIndex = 0;
+                                  const textParts = [];
+                                  
+                                  // Sort feedback items by start_index
+                                  const sortedFeedback = [...analysis.feedback].sort(
+                                    (a, b) => a.start_index - b.start_index
+                                  );
+                                  
+                                  sortedFeedback.forEach((item, index) => {
+                                    // Add text before the highlight
+                                    if (item.start_index > lastIndex) {
+                                      textParts.push(
+                                        <span key={`text-${index}`}>
+                                          {discussionGuide.substring(lastIndex, item.start_index)}
+                                        </span>
+                                      );
+                                    }
+                                    
+                                    // Add highlighted text
+                                    textParts.push(
+                                      <span 
+                                        key={`highlight-${index}`}
+                                        className={`cursor-pointer px-0.5 rounded ${item.type === 'warning' ? 'bg-yellow-200' : 'bg-blue-200'}`}
+                                        onMouseEnter={(e) => {
+                                          setHoverHighlight({
+                                            item,
+                                            x: e.clientX,
+                                            y: e.clientY
+                                          });
+                                        }}
+                                        onMouseLeave={() => setHoverHighlight(null)}
+                                      >
+                                        {discussionGuide.substring(item.start_index, item.end_index)}
+                                      </span>
+                                    );
+                                    
+                                    lastIndex = item.end_index;
+                                  });
+                                  
+                                  // Add any remaining text after the last highlight
+                                  if (lastIndex < discussionGuide.length) {
+                                    textParts.push(
+                                      <span key="text-end">
+                                        {discussionGuide.substring(lastIndex)}
+                                      </span>
+                                    );
+                                  }
+                                  
+                                  return textParts;
+                                })()} 
+                              </>
+                            ) : (
+                              // Render plain text if no feedback items
+                              <p>{discussionGuide}</p>
+                            )}
+                          </div>
+                          
+                          {/* Tooltip for hover highlight */}
+                          {hoverHighlight && createPortal(
+                            <div 
+                              className="fixed z-50 p-3 rounded-md shadow-lg border bg-white max-w-xs"
+                              style={{
+                                left: `${hoverHighlight.x}px`,
+                                top: `${hoverHighlight.y - 10}px`,
+                                transform: 'translate(-50%, -100%)'
+                              }}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <Badge 
+                                  variant={hoverHighlight.item.type === 'warning' ? 'destructive' : 'secondary'}
+                                  className="mb-2"
+                                >
+                                  {hoverHighlight.item.type === 'warning' ? 'Warning' : 'Recommendation'}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  Confidence: {Math.round(hoverHighlight.item.confidence_level * 100)}%
+                                </span>
+                              </div>
+                              <p className="text-sm">{hoverHighlight.item.note}</p>
+                            </div>,
+                            document.body
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
       </section>
-
-      {/* Analysis Results */}
-      {error && (
-        <section className="py-8">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <Card className="border-destructive">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2 text-destructive mb-2">
-                  <div className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
-                  <span className="font-medium">Error</span>
-                </div>
-                <p className="text-sm">{error}</p>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-      )}
-
-      {analysis && (
-        <section className="py-8">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  Analysis Complete
-                </CardTitle>
-                <CardDescription>
-                  {analysis.summary}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {analysis.feedback.map((item, index) => (
-                    <div
-                      key={index}
-                      className={`p-4 rounded-lg border ${
-                        item.type === 'warning' 
-                          ? 'border-yellow-200 bg-yellow-50' 
-                          : 'border-blue-200 bg-blue-50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <Badge 
-                          variant={item.type === 'warning' ? 'destructive' : 'secondary'}
-                          className="mb-2"
-                        >
-                          {item.type === 'warning' ? 'Warning' : 'Recommendation'}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          Confidence: {Math.round(item.confidence_level * 100)}%
-                        </span>
-                      </div>
-                      <p className="text-sm mb-2">
-                        <strong>Text:</strong> "{discussionGuide.slice(item.start_index, item.end_index)}"
-                      </p>
-                      <p className="text-sm">{item.note}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-      )}
 
       {/* Sample Questions */}
       <section className="py-12 bg-muted/30">
