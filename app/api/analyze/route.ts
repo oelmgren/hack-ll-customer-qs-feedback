@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
@@ -60,6 +60,10 @@ export async function POST(request: NextRequest) {
                     end_index: {
                       type: "number", 
                       description: "Character position where this feedback ends"
+                    },
+                    highlighted_text: {
+                      type: "string", 
+                      description: "String that we're attempting to highlight / flag"
                     },
                     type: {
                       type: "string",
