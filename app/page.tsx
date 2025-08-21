@@ -104,12 +104,12 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="py-16 sm:py-24">
+      <section className="py-8 sm:py-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl mb-6">
             Perfect Your Customer <span className="text-primary">Interview Questions</span>
           </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Get instant feedback on your discussion guides. Ensure every customer conversation delivers valuable insights.
           </p>
         </div>

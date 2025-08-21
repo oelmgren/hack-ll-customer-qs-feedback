@@ -1,19 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-
-// Define the feedback item schema
-interface FeedbackItem {
-  start_index: number;
-  end_index: number;
-  type: 'recommendation' | 'warning';
-  note: string;
-  confidence_level: number; // 0-1 scale
-}
-
-interface AnalysisResponse {
-  feedback: FeedbackItem[];
-  summary: string;
-}
+import { DISCUSSION_GUIDE_ANALYSIS_PROMPT, SYSTEM_PROMPT } from '@/lib/prompts';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -38,63 +25,85 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const prompt = `Analyze the following customer interview discussion guide and provide feedback. 
-
-Discussion Guide:
-${discussionGuide}
-
-Please analyze this discussion guide and provide specific feedback in the following JSON format:
-
-{
-  "feedback": [
-    {
-      "start_index": <character position where this feedback starts>,
-      "end_index": <character position where this feedback ends>,
-      "type": "recommendation" or "warning",
-      "note": "Detailed explanation of the feedback",
-      "confidence_level": <number between 0 and 1 indicating confidence>
-    }
-  ],
-  "summary": "Overall assessment of the discussion guide"
-}
-
-Focus on:
-1. Question quality and clarity
-2. Potential bias or leading questions
-3. Logical flow and sequencing
-4. Best practices for customer research
-5. Areas for improvement
-
-Return only valid JSON.`;
-
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: "You are an expert in customer research and user interview methodology. Provide specific, actionable feedback on discussion guides."
+          content: SYSTEM_PROMPT
         },
         {
           role: "user",
-          content: prompt
+          content: DISCUSSION_GUIDE_ANALYSIS_PROMPT.replace('{discussionGuide}', discussionGuide)
         }
       ],
       temperature: 0.3,
       max_tokens: 2000,
+      response_format: { type: "json_object" },
+      functions: [
+        {
+          name: "analyze_discussion_guide",
+          description: "Analyze a customer interview discussion guide and provide structured feedback",
+          parameters: {
+            type: "object",
+            properties: {
+              feedback: {
+                type: "array",
+                description: "List of specific feedback items",
+                items: {
+                  type: "object",
+                  properties: {
+                    start_index: {
+                      type: "number",
+                      description: "Character position where this feedback starts"
+                    },
+                    end_index: {
+                      type: "number", 
+                      description: "Character position where this feedback ends"
+                    },
+                    type: {
+                      type: "string",
+                      enum: ["recommendation", "warning"],
+                      description: "Type of feedback"
+                    },
+                    note: {
+                      type: "string",
+                      description: "Detailed explanation of the feedback"
+                    },
+                    confidence_level: {
+                      type: "number",
+                      minimum: 0,
+                      maximum: 1,
+                      description: "Confidence level between 0 and 1"
+                    }
+                  },
+                  required: ["start_index", "end_index", "type", "note", "confidence_level"]
+                }
+              },
+              summary: {
+                type: "string",
+                description: "Overall assessment of the discussion guide"
+              }
+            },
+            required: ["feedback", "summary"]
+          }
+        }
+      ],
+      function_call: { name: "analyze_discussion_guide" }
     });
 
-    const responseText = completion.choices[0]?.message?.content;
+    const functionCall = completion.choices[0]?.message?.function_call;
     
-    if (!responseText) {
-      throw new Error('No response from OpenAI');
+    if (!functionCall || !functionCall.arguments) {
+      throw new Error('No structured response from OpenAI');
     }
 
-    // Parse the JSON response
-    let analysis: AnalysisResponse;
+    // Parse the function call arguments
+    let analysis: any;
     try {
-      analysis = JSON.parse(responseText);
+      analysis = JSON.parse(functionCall.arguments);
     } catch (parseError) {
-      console.error('Failed to parse OpenAI response:', responseText);
+      console.error('Failed to parse function call arguments:', functionCall.arguments);
       return NextResponse.json(
         { error: 'Invalid response format from AI service' },
         { status: 500 }
